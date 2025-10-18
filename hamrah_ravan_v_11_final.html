@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+<meta charset="UTF-8">
+<title>اپلیکیشن همراه روان - نسخه نهایی V11</title>
+<style>
+@import url('https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/font-face.css');
+body {margin:0;font-family:'Vazir',sans-serif;background-color:#cce7ff;color:#333;}
+.overlay{min-height:100vh;padding:20px;}
+h1,h2,h3{text-align:center;}
+button{padding:10px 20px;border-radius:10px;border:none;cursor:pointer;margin:5px;font-size:16px;background-color:#3399ff;color:white;}
+button:hover{opacity:0.8;}
+.card{background:#e6f0ff;border-radius:15px;padding:20px;margin:20px auto;max-width:500px;box-shadow:0 5px 15px rgba(0,0,0,0.2);}
+input, select, textarea{width:100%;padding:8px;margin:5px 0 15px 0;border-radius:8px;border:1px solid #ccc;}
+.hidden{display:none;}
+.chat-box{max-height:200px;overflow-y:auto;border:1px solid #ccc;padding:10px;border-radius:10px;background:#f0f8ff;}
+.chat-msg{margin:5px 0;}
+.chat-patient{text-align:right;color:blue;}
+.chat-doctor{text-align:left;color:green;}
+</style>
+</head>
+<body>
+<div class="overlay">
+  <div id="home" class="card">
+    <h1>اپلیکیشن همراه روان</h1>
+    <h3>سامانه پایش خلق و خواب بیماران دو قطبی</h3>
+    <div style="text-align:center;margin-top:20px;">
+      <button onclick="showRole('patient')">ورود/ثبت‌نام بیمار</button>
+      <button onclick="showRole('doctor')">ورود/ثبت‌نام پزشک</button>
+    </div>
+  </div>
+
+  <!-- فرم‌ها و پنل‌ها -->
+  <div id="patient" class="card hidden">
+    <h2>ورود یا ثبت‌نام بیمار</h2>
+    <label>نام کاربری:</label><input type="text" id="p_username">
+    <label>رمز:</label><input type="password" id="p_password">
+    <label>تکرار رمز:</label><input type="password" id="p_password_repeat">
+    <label>انتخاب یا وارد کردن نام پزشک:</label>
+    <select id="p_doctor_select"></select>
+    <input type="text" id="p_doctor_manual" placeholder="اگر پزشک موجود نیست، نام پزشک خود را وارد کنید">
+    <input type="checkbox" id="savePatient"> ذخیره اطلاعات روی این سیستم
+    <div style="text-align:center;margin-top:10px;">
+      <button onclick="registerPatient()">ثبت نام</button>
+      <button onclick="loginPatient()">ورود</button>
+      <button onclick="goHome()">🚪 خروج</button>
+    </div>
+  </div>
+
+  <div id="doctor" class="card hidden">
+    <h2>ورود یا ثبت‌نام پزشک</h2>
+    <label>نام کاربری:</label><input type="text" id="d_username">
+    <label>رمز:</label><input type="password" id="d_password">
+    <label>تکرار رمز:</label><input type="password" id="d_password_repeat">
+    <div style="text-align:center;margin-top:10px;">
+      <button onclick="registerDoctor()">ثبت نام</button>
+      <button onclick="loginDoctor()">ورود</button>
+      <button onclick="goHome()">🚪 خروج</button>
+    </div>
+  </div>
+
+  <div id="patientPanel" class="card hidden">
+    <h2 id="welcomePatient"></h2>
+    <label>تاریخ (شمسی):</label><input type="text" id="p_date" placeholder="مثلاً 1404/07/28">
+    <label>خواب (ساعت شب / صبح):</label><input type="text" id="p_sleep">
+    <label>خلق و خو:</label>
+    <select id="p_mood">
+      <option value="خیلی افسرده">خیلی افسرده</option>
+      <option value="افسرده">افسرده</option>
+      <option value="متوسط">متوسط</option>
+      <option value="خوب">خوب</option>
+      <option value="خیلی خوب">خیلی خوب</option>
+    </select>
+    <label>داروها (نام/دوز):</label><textarea id="p_meds"></textarea>
+    <label>دل‌نوشته:</label><textarea id="p_note"></textarea>
+    <div style="text-align:center;margin-top:10px;">
+      <button onclick="savePatientData()">ذخیره</button>
+      <button onclick="showResults()">مشاهده نتایج</button>
+      <button onclick="showChat()">پیام پزشک</button>
+      <button onclick="logoutPatient()">🚪 خروج</button>
+    </div>
+    <div id="patientResults" class="hidden"></div>
+    <div id="chatPatient" class="chat-box hidden"></div>
+    <input type="text" id="chatInputPatient" class="hidden" placeholder="پیام خود را بنویسید...">
+    <button id="sendChatPatient" class="hidden" onclick="sendPatientMsg()">ارسال</button>
+  </div>
+
+  <div id="doctorPanel" class="card hidden">
+    <h2 id="welcomeDoctor"></h2>
+    <h3>لیست بیماران شما:</h3>
+    <div id="doctorPatients"></div>
+    <div id="doctorPatientData" class="hidden">
+      <h3 id="selectedPatient"></h3>
+      <div id="patientCharts"></div>
+      <div id="chatDoctor" class="chat-box"></div>
+      <input type="text" id="chatInputDoctor" placeholder="پاسخ خود را بنویسید...">
+      <button onclick="sendDoctorMsg()">ارسال</button>
+      <button onclick="closePatientData()">بستن پرونده بیمار</button>
+      <button onclick="logoutDoctor()">🚪 خروج</button>
+    </div>
+  </div>
+
+</div>
+<script>
+// داده‌ها
+let patients=JSON.parse(localStorage.getItem('patients')||'[]');
+let doctors=JSON.parse(localStorage.getItem('doctors')||'[]');
+let messages=JSON.parse(localStorage.getItem('messages')||'[]');
+let currentPatient=null,currentDoctor=null;
+
+function goHome(){document.getElementById('home').classList.remove('hidden');['patient','doctor','patientPanel','doctorPanel'].forEach(id=>document.getElementById(id).classList.add('hidden'));}
+function showRole(role){goHome();document.getElementById(role).classList.remove('hidden');updateDoctorSelect();document.getElementById('home').classList.add('hidden');}
+function updateDoctorSelect(){let sel=document.getElementById('p_doctor_select');sel.innerHTML='';doctors.forEach(d=>{let opt=document.createElement('option');opt.value=d.username;opt.text=d.username;sel.appendChild(opt);});}
+
+function registerPatient(){let u=document.getElementById('p_username').value;
+let p=document.getElementById('p_password').value;
+let r=document.getElementById('p_password_repeat').value;
+let doc=document.getElementById('p_doctor_manual').value||document.getElementById('p_doctor_select').value;
+if(!u||!p||!r||!doc){alert('تمام فیلدها را پر کنید');return;}
+if(p!==r){alert('رمزها یکسان نیست');return;}
+if(patients.find(x=>x.username===u)){alert('نام کاربری تکراری است');return;}
+patients.push({username:u,password:p,doctor:doc,data:[]});localStorage.setItem('patients',JSON.stringify(patients));alert('ثبت نام موفق');}
+
+function loginPatient(){let u=document.getElementById('p_username').value;
+let p=document.getElementById('p_password').value;
+let patient=patients.find(x=>x.username===u);
+if(!patient){alert('ابتدا ثبت نام کنید');return;}
+if(patient.password!==p){alert('رمز اشتباه است');return;}
+currentPatient=patient;document.getElementById('welcomePatient').innerText='سلام '+u;document.getElementById('patientPanel').classList.remove('hidden');['home','patient','doctor'].forEach(id=>document.getElementById(id).classList.add('hidden'));showChat();}
+
+function registerDoctor(){let u=document.getElementById('d_username').value;
+let p=document.getElementById('d_password').value;
+let r=document.getElementById('d_password_repeat').value;
+if(!u||!p||!r){alert('تمام فیلدها را پر کنید');return;}
+if(p!==r){alert('رمزها یکسان نیست');return;}
+if(doctors.find(x=>x.username===u)){alert('نام کاربری تکراری');return;}
+doctors.push({username:u,password:p,patients:[]});localStorage.setItem('doctors',JSON.stringify(doctors));alert('ثبت نام موفق');}
+
+function loginDoctor(){let u=document.getElementById('d_username').value;
+let p=document.getElementById('d_password').value;
+let doc=doctors.find(x=>x.username===u);
+if(!doc){alert('ابتدا ثبت نام کنید');return;}
+if(doc.password!==p){alert('رمز اشتباه است');return;}
+currentDoctor=doc;document.getElementById('welcomeDoctor').innerText='سلام دکتر '+u;document.getElementById('doctorPanel').classList.remove('hidden');['home','doctor','patient'].forEach(id=>document.getElementById(id).classList.add('hidden'));}
+
+function savePatientData(){let date=document.getElementById('p_date').value;let sleep=document.getElementById('p_sleep').value;
+let mood=document.getElementById('p_mood').value;let meds=document.getElementById('p_meds').value;let note=document.getElementById('p_note').value;
+let entry={date,sleep,mood,meds,note};currentPatient.data.push(entry);localStorage.setItem('patients',JSON.stringify(patients));alert('ذخیره شد');}
+
+function showResults(){let res=document.getElementById('patientResults');res.innerHTML='';currentPatient.data.forEach(d=>{let div=document.createElement('div');div.innerHTML=`تاریخ: ${d.date} | خواب: ${d.sleep} | خلق: ${d.mood} | دارو: ${d.meds} | دلنوشته: ${d.note}`;res.appendChild(div);});res.classList.remove('hidden');}
+
+function logoutPatient(){currentPatient=null;goHome();}
+function logoutDoctor(){currentDoctor=null;goHome();}
+
+function showChat(){document.getElementById('chatPatient').classList.remove('hidden');document.getElementById('chatInputPatient').classList.remove('hidden');document.getElementById('sendChatPatient').classList.remove('hidden');updatePatientChat();}
+function updatePatientChat(){let chat=document.getElementById('chatPatient');chat.innerHTML='';let msgs=messages.filter(m=>m.patient===currentPatient.username&&m.doctor===currentPatient.doctor);
+msgs.forEach(m=>{let div=document.createElement('div');div.className='chat-msg '+(m.from==='patient'?'chat-patient':'chat-doctor');div.innerText=m.from==='patient'?('شما: '+m.text):('دکتر: '+m.text);chat.appendChild(div);});chat.scrollTop=chat.scrollHeight;}
+function sendPatientMsg(){let txt=document.getElementById('chatInputPatient').value;if(!txt)return;messages.push({from:'patient',patient:currentPatient.username,doctor:currentPatient.doctor,text:txt});
